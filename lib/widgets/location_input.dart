@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:favorite_places_app_flutter/models/place.dart';
+import 'package:favorite_places_app_flutter/screens/map.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -28,6 +29,25 @@ class _LocationInputState extends State<LocationInput> {
     final lat = _pickedLocation!.latitude;
     final lng = _pickedLocation!.longitude;
     return 'https://tile.openstreetmap.org/#map=19/$lat/$lng';
+  }
+
+  Future<void> _savePlace(double latitude, double longitude) async {
+    final url = Uri.parse(
+        'https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=$latitude&lon=$longitude');
+    final response = await http.get(url);
+    final resData = json.decode(response.body);
+    final address = resData['display_name'];
+
+    setState(() {
+      _pickedLocation = PlaceLocation(
+        latitude: latitude,
+        longitude: longitude,
+        address: address,
+      );
+      _isGettingLocation = false;
+    });
+
+    widget.onSelectLocation(_pickedLocation!);
   }
 
   Future<void> _getCurrentLocation() async {
@@ -65,18 +85,20 @@ class _LocationInputState extends State<LocationInput> {
       return;
     }
 
-    final url = Uri.parse(
-        'https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=$lat&lon=$lng');
-    final response = await http.get(url);
-    final resData = json.decode(response.body);
-    final address = resData['display_name'];
+    _savePlace(lat, lng);
+  }
 
-    setState(() {
-      _pickedLocation = PlaceLocation(lat, lng, address);
-      _isGettingLocation = false;
-    });
+  void _selectOnMap() async {
+    final pickedLocation = await Navigator.of(context).push<LatLng>(
+      MaterialPageRoute(
+        builder: (ctx) => const MapScreen(),
+      ),
+    );
 
-    widget.onSelectLocation(_pickedLocation!);
+    if (pickedLocation == null) {
+      return;
+    }
+    _savePlace(pickedLocation.latitude, pickedLocation.longitude);
   }
 
   @override
@@ -150,7 +172,7 @@ class _LocationInputState extends State<LocationInput> {
               label: const Text('Get Current Location'),
             ),
             TextButton.icon(
-              onPressed: () {},
+              onPressed: _selectOnMap,
               icon: const Icon(Icons.map),
               label: const Text('Select on map'),
             ),
